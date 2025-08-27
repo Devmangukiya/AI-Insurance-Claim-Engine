@@ -17,8 +17,9 @@ RUN apt-get update && apt-get install -y \
 ## Copying all contents from local to container
 COPY . .
 
-## Install Python dependencies
-RUN pip install --no-cache-dir -e .
+## Upgrade pip & install Python dependencies
+RUN pip install --upgrade pip setuptools wheel && \
+    pip install --no-cache-dir -e .
 
 ## Expose only flask port
 EXPOSE 5000
