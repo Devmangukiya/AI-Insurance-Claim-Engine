@@ -1,12 +1,12 @@
 pipeline {
     agent any
 
-    // environment {
-    //     AWS_REGION = 'us-east-1'
-    //     ECR_REPO = 'my-repo'
-    //     IMAGE_TAG = 'latest'
-    //     SERVICE_NAME = 'llmops-medical-service'
-    // }
+    environment {
+        AWS_REGION = 'us-east-1'
+        ECR_REPO = 'my-repo'
+        IMAGE_TAG = 'latest'
+        SERVICE_NAME = 'llmops-medical-service'
+    }
 
     stages {
         stage('Clone GitHub Repo') {
@@ -17,33 +17,31 @@ pipeline {
             }
         }
 
-    //     stage('Build, Scan, and Push Docker Image to ECR') {
-    //         steps {
-    //             withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-token']]) {
-    //                 script {
-    //                     def accountId = sh(script: "aws sts get-caller-identity --query Account --output text", returnStdout: true).trim()
-    //                     def ecrUrl = "${accountId}.dkr.ecr.${env.AWS_REGION}.amazonaws.com/${env.ECR_REPO}"
-    //                     def imageFullTag = "${ecrUrl}:${IMAGE_TAG}"
+        stage('Build, Scan, and Push Docker Image to ECR') {
+            steps {
+                withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-token']]) {
+                    script {
+                        def accountId = sh(script: "aws sts get-caller-identity --query Account --output text", returnStdout: true).trim()
+                        def ecrUrl = "${accountId}.dkr.ecr.${env.AWS_REGION}.amazonaws.com/${env.ECR_REPO}"
+                        def imageFullTag = "${ecrUrl}:${IMAGE_TAG}"
 
-    //                     // Each command is now separate for clarity and targeted retries
-    //                     sh "aws ecr get-login-password --region ${AWS_REGION} | docker login --username AWS --password-stdin ${ecrUrl}"
-    //                     sh "docker build -t ${env.ECR_REPO}:${IMAGE_TAG} ."
+                        // Each command is now separate for clarity and targeted retries
+                        sh "aws ecr get-login-password --region ${AWS_REGION} | docker login --username AWS --password-stdin ${ecrUrl}"
+                        sh "docker build -t ${env.ECR_REPO}:${IMAGE_TAG} ."
                         
-    //                     // Run Trivy scan - '|| true' ensures the pipeline doesn't stop if vulnerabilities are found
+                        // Run Trivy scan - '|| true' ensures the pipeline doesn't stop if vulnerabilities are found
                         
-    //                     sh "docker tag ${env.ECR_REPO}:${IMAGE_TAG} ${imageFullTag}"
+                        sh "docker tag ${env.ECR_REPO}:${IMAGE_TAG} ${imageFullTag}"
 
-    //                     // SOLUTION for Network Error: Retry the push command up to 3 times if it fails
-    //                     retry(3) {
-    //                         echo "Attempting to push Docker image (Attempt: \$${env.RETRY_COUNT})..."
-    //                         sh "docker push ${imageFullTag}"
-    //                     }
-
-    //                     // Archive the security scan report
-    //                 }
-    //             }
-    //         }
-    //     }
+                        // SOLUTION for Network Error: Retry the push command up to 3 times if it fails
+                        retry(3) {
+                            echo "Attempting to push Docker image (Attempt: \$${env.RETRY_COUNT})..."
+                            sh "docker push ${imageFullTag}"
+                        }
+                    }
+                }
+            }
+        }
 
     //     stage('Deploy to AWS App Runner') {
     //         steps {
