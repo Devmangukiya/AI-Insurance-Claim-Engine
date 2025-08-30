@@ -1,38 +1,17 @@
 import json
-import re
 from langchain.chains import LLMChain
 from langchain_core.prompts import PromptTemplate
 
-# ... your other imports ...
+from app.components.llm import load_llm
+from app.components.vector_store import load_vector_store
+from app.config.config import GROQ_API_KEY, GROQ_MODEL_NAME
 from app.common.logger import get_logger
 from app.common.custom_exception import CustomException
 
 logger = get_logger(__name__)
 
-# --- 1. NEW, MORE ROBUST JSON EXTRACTOR ---
-def extract_json_from_string(s: str) -> str:
-    """Finds and extracts the first valid JSON object from a string, handling incomplete JSON."""
-    # Find the first '{' and the last '}'
-    start = s.find('{')
-    end = s.rfind('}')
-    if start != -1 and end != -1 and end > start:
-        json_str = s[start:end+1]
-        # Try to parse it to see if it's valid, if not, it's likely incomplete
-        try:
-            json.loads(json_str)
-            return json_str
-        except json.JSONDecodeError:
-            # If it fails, it's probably an incomplete JSON, return an empty object
-            logger.warning("Incomplete JSON detected, returning empty object.")
-            return "{}"
-    return "{}" # Return empty JSON if no object is found
-
-# Your PROMPT_PARSER remains the same...
-PROMPT_PARSER = PromptTemplate(
-    template="""...""", # Your existing parser prompt
-    input_variables=["question"],
-)
-
+# ## TEMPLATE 1: For Parsing the User's Raw Query ##
+# This prompt turns the natural language query into structured JSON data.
 PROMPT_PARSER = PromptTemplate(
     template="""
 ### ROLE ###
@@ -87,25 +66,56 @@ Analyze the Claimant Details and evaluate them against the Relevant Policy Claus
     input_variables=["claimant_details", "context"],
 )
 
-
-def run_adjudication_chain(query:str, llm, db):
+def run_adjudication_chain(query: str,llm,db):
     """
-    Orchestrates the two-prompt chain to process a query and returns a decision.
+    Orchestrates the two-prompt chain to process a query and return a decision.
+    
+    Args:
+        query: The raw natural language query from the user.
+
+    Returns:
+        A dictionary with the final decision.
     """
     try:
-        # STEP 1: PARSE THE USER QUERY
+        # --- Load necessary components ---
+        logger.info("Loading LLM and Vector Store...")
+        llm = load_llm(model_name=GROQ_MODEL_NAME,groq_api_key=GROQ_API_KEY)
+        db = load_vector_store()
+
+        if llm is None or db is None:
+            raise CustomException("Failed to load LLM or Vector Store.")
+
+        # STEP 1: PARSE THE USER QUERY 
         logger.info(f"Step 1: Parsing query: '{query}'")
         parser_chain = LLMChain(llm=llm, prompt=PROMPT_PARSER)
         parser_output = parser_chain.run(question=query)
+
+            
+        print("\n" + "="*20 + " RAW PARSER OUTPUT " + "="*20)
+        print(parser_output)
+        print("="*59 + "\n")
         
-        json_string = extract_json_from_string(parser_output)
+        
+        # Clean the string to remove markdown wrappers before parsing
+        if "```" in parser_output:
+            start_index = parser_output.find('{')
+            end_index = parser_output.rfind('}') + 1
+            json_string = parser_output[start_index:end_index]
+        else:
+            json_string = parser_output
+
+        # parse the cleaned string
         claimant_details_json = json.loads(json_string)
         logger.info(f"Successfully parsed details: {claimant_details_json}")
 
-        # STEP 2: RETRIEVE RELEVANT CLAUSES (RAG)
+        # STEP 2: RETRIEVE RELEVANT CLAUSES (RAG) 
         logger.info("Step 2: Retrieving relevant documents from vector store...")
-        retriever = db.as_retriever(search_kwargs={"k": 10})
+        retriever = db.as_retriever(search_kwargs={"k": 10}) 
+        
+        # We use the original, context-rich query for the semantic search
         retrieved_docs = retriever.get_relevant_documents(query)
+        
+        # Format the retrieved documents into a single string for the next prompt
         context_string = "\n\n".join([f"Clause Reference {i+1}: {doc.page_content}" for i, doc in enumerate(retrieved_docs)])
         logger.info("Document retrieval complete.")
 
@@ -118,20 +128,25 @@ def run_adjudication_chain(query:str, llm, db):
             context=context_string
         )
 
-        json_string_final = extract_json_from_string(final_output_str)
+        print("\n" + "="*20 + " RAW DECISION MAKER OUTPUT " + "="*20)
+        print(final_output_str)
+        print("="*65 + "\n")
+        
+        # Clean the string to remove markdown wrappers before parsing
+        if "```" in final_output_str:
+            start_index = final_output_str.find('{')
+            end_index = final_output_str.rfind('}') + 1
+            json_string_final = final_output_str[start_index:end_index]
+        else:
+            json_string_final = final_output_str
+
+        # Parse the final cleaned JSON output string into a dictionary
         final_decision = json.loads(json_string_final)
         logger.info("Adjudication chain completed successfully.")
         
         return final_decision
 
     except json.JSONDecodeError as e:
-        logger.error("--- FAILED TO PARSE JSON ---")
-        parser_output_for_log = locals().get('parser_output', 'Not available')
-        final_output_for_log = locals().get('final_output_str', 'Not available')
-        
-        logger.error(f"The AI returned this broken string: {parser_output_for_log or final_output_for_log}")
-        logger.error(f"JSONDecodeError details: {e}")
-
         error_message = CustomException("Failed to parse JSON output from LLM.", e)
         logger.error(str(error_message))
         return {"error": "Failed to process the request due to invalid format from AI."}
