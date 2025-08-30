@@ -23,15 +23,26 @@ pipeline {
                 withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-token']]) {
                     script {
                         def accountId = sh(script: "aws sts get-caller-identity --query Account --output text", returnStdout: true).trim()
-                        def ecrUrl = "${accountId}.dkr.ecr.${env.AWS_REGION}.amazonaws.com/${env.ECR_REPO}"
-                        def imageFullTag = "${ecrUrl}:${IMAGE_TAG}"
+                        def ecrUrl = "${accountId}.dkr.ecr.${env.AWS_REGION}.amazonaws.com"
+                        def repositoryUrl = "${ecrUrl}/${env.ECR_REPO}"
+                        def imageFullTag = "${repositoryUrl}:${IMAGE_TAG}"
 
-                        sh """
-                        aws ecr get-login-password --region ${AWS_REGION} | docker login --username AWS --password-stdin ${ecrUrl}
-                        docker build -t ${env.ECR_REPO}:${IMAGE_TAG} .
-                        docker tag ${env.ECR_REPO}:${IMAGE_TAG} ${imageFullTag}
-                        docker push ${imageFullTag}
-                        """
+                        // Step 1: Login to ECR. This is fast and unlikely to fail.
+                        sh "aws ecr get-login-password --region ${AWS_REGION} | docker login --username AWS --password-stdin ${ecrUrl}"
+                        
+                        // Step 2: Build the image. This can be slow but should be reliable.
+                        sh "docker build -t ${env.ECR_REPO}:${IMAGE_TAG} ."
+                        
+                        // Step 3: Tag the image for ECR. This is a very fast, local operation.
+                        sh "docker tag ${env.ECR_REPO}:${IMAGE_TAG} ${imageFullTag}"
+                        
+                        // Step 4: Push the image. This is the step that fails.
+                        // We will wrap only this command in a retry block.
+                        retry(3) {
+                            echo "Attempting to push Docker image: ${imageFullTag}"
+                            sh "docker push ${imageFullTag}"
+                        }
+                        echo "Docker image push successful!"
                     }
                 }
             }
