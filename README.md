@@ -111,12 +111,11 @@ python application.py
 
 
 # 🚀 Usage
-1. Navigate to http://127.0.0.1:5000 in your web browser.
 
-2. Enter a query in the text box. Be as specific or as vague as you like.
+1. Enter a query in the text box. Be as specific or as vague as you like.
 
-3. Example 1: 42-year-old man, cataract surgery in Mumbai, policy is 3 years old
+2. Example 1: 42-year-old man, cataract surgery in Mumbai, policy is 3 years old
 
-4. Example 2: my wife needs knee surgery in pune, we got the policy 2 months ago
+3. Example 2: my wife needs knee surgery in pune, we got the policy 2 months ago
 
-5. Click "Evaluate Claim" to receive the AI-generated decision and justification.
+4. Click "Evaluate Claim" to receive the AI-generated decision and justification.
