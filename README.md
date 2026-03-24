@@ -1,121 +1,187 @@
-# 🤖 AI-Powered Engine for Insurance Policy Claims 🤖
-An intelligent system built for a hackathon that uses Large Language Models (LLMs) and Retrieval-Augmented Generation (RAG) to process natural language insurance queries, retrieve information from unstructured policy documents, and make automated, auditable decisions.
+# AI-Insurance-Claim-Engine
 
-# 🚀 Key Features
-  - Natural Language Understanding: Parses complex, informal user queries (e.g., "46M, knee surgery, Pune, 3-month policy") into a structured format.
+A modern, large language model (LLM)-powered system for automated adjudication of insurance claims. This engine processes raw user queries about insurance claims, retrieves relevant clauses from policy documents, and determines claim approval or rejection with clear, clause-referenced justifications.
 
-  - Semantic Document Search: Utilizes a vector database (FAISS) and sentence-transformer embeddings to find the most relevant clauses from a large corpus of unstructured policy documents (PDFs, etc.).
+---
 
-  - Intelligent Decision Making: Employs a two-step LLM chain to first parse the query and then reason over the retrieved clauses to make a final, justified decision.
+## Table of Contents
 
-  - Understands Key Insurance Logic: The system is designed to interpret and apply critical insurance concepts like waiting periods, specific procedure exclusions, and coverage limits.
+- [Overview](#overview)
+- [Features](#features)
+- [Architecture](#architecture)
+- [Installation](#installation)
+- [Usage](#usage)
+- [Configuration](#configuration)
+- [Development](#development)
+- [Technologies Used](#technologies-used)
+- [License](#license)
 
-  - Auditable Responses: Every decision (Approved/Rejected) is returned in a structured JSON format, complete with justifications that cite the exact source clauses from the documents.
+---
 
-  - Web Interface: A simple and intuitive web interface built with Flask for easy interaction and demonstration.
+## Overview
 
-# 🔑 Key Insurance Terms Handled
-This system is specifically designed to understand and reason with the following core insurance concepts found in policy documents:
+**AI-Insurance-Claim-Engine** streamlines and automates the process of evaluating insurance claims using state-of-the-art LLMs and Retrieval Augmented Generation (RAG). Given a user’s claim query, it:
 
-  - Waiting Period: The duration a policyholder must wait after the policy's inception before certain coverages become effective. The AI checks the policy tenure against these rules (e.g., a 24-month wait for cataract surgery).
+1. Parses and extracts structured details from the query.
+2. Finds relevant policy clauses using a vector search.
+3. Adjudicates claim validity and computes payout, providing justification mapped to source clauses.
 
-  - Exclusions: Specific conditions, procedures, or circumstances that are not covered by the policy. The AI actively looks for these clauses to prevent incorrect approvals.
+The engine is designed for extensibility, robust logging, and explainable output—making it valuable for insurance operations requiring transparency and auditability.
 
-  - Covered Procedures: A list of medical treatments and surgeries that are eligible for a claim. The system matches the user's query against this list.
+---
 
-  - Deductible: The amount the insured must pay out-of-pocket before the insurer pays a claim. While not calculating the final payout, the AI can identify if a deductible applies.
+## Features
 
-  - Co-payment: A fixed amount the insured pays for a covered health care service. The AI can identify clauses mentioning co-payment responsibilities.
+- **End-to-End Claim Adjudication**: From natural language input to detailed, structured decision.
+- **RAG Architecture**: Retrieves precise clauses from vectorized policy document storage.
+- **LLM-Based Reasoning**: Employs cutting-edge large language models for entity extraction and decision logic.
+- **Web Interface**: Minimal Flask-based web UI for interactive queries.
+- **Detailed, Explainable Output**: Presents approval/rejection, payout, and clear, clause-backed justification.
+- **Session Management**: Maintains conversational context and chat history.
 
-# ⚙️ How It Works (Architecture)
-This project uses a sophisticated two-prompt RAG chain to ensure both accuracy and consistency.
+---
 
-1. Query Parsing:
+## Architecture
 
-  - The user's raw query is first sent to an LLM chain specifically prompted to act as a data extractor.
+**Key Flow:**
+1. **User Query Input**: Typed via web UI.
+2. **Entity Parsing**: LLM parses claim details from the query.
+3. **Clause Retrieval**: Vector store indexes policy documents; retrieves relevant clauses.
+4. **Decision Making**: LLM reasons over claim details and policy clauses, outputs structured JSON.
+5. **Result Display**: Response rendered in chat with breakdown and justifications.
 
-  - It identifies key entities (age, procedure, location, policy tenure) and converts the query into a structured JSON object.
+**Main Components:**
+```
+- app/
+  - application.py         # Flask entry point and main controller
+  - components/
+      - retriever.py       # End-to-end orchestration: parsing, retrieval, and decision logic
+      - pdf_loader.py      # Loads and preprocesses policy PDFs
+      - llm.py             # Model loading/configuration (e.g., Groq Llama3)
+      - vector_store.py    # Vector DB (FAISS) loader for semantic search
+      - data_loader.py     # Data ingestion and chunking support
+      - embeddings.py      # Embedding generation for chunks
+      - ...
+  - config/
+      - config.py          # Environment and system configuration
+  - common/
+      - logger.py, custom_exception.py    # Robust logging and error handling
+  - templates/index.html   # Main HTML interface
+- data/                    # Example PDF policy files
+- vectorstore/db_faiss/    # Vector index for fast clause retrieval
+- requirements.txt         # Python dependencies
+- Dockerfile               # Containerization configuration
+```
 
-2. Semantic Retrieval (RAG):
+---
 
-  - The original query is used to perform a semantic search against a pre-computed FAISS vector store containing embeddings of the policy documents.
+## Installation
 
-  - The system retrieves the top k most relevant document chunks (clauses) to form a context for the decision-making step.
+### Prerequisites
 
-3. Decision Making:
+- Python 3.10+
+- [Groq](https://groq.com/) API key (for LLM access)
+- [Hugging Face](https://huggingface.co/) token (optional, for local LLMs)
+- Docker (optional)
 
-  - A second, more powerful LLM chain is prompted to act as an "Insurance Claims Adjudicator."
+### Quick Start (Recommended)
 
-  - It receives the structured JSON from Step 1 and the retrieved clauses from Step 2.
+1. **Clone the repository:**
+   ```sh
+   git clone https://github.com/Devmangukiya/AI-Insurance-Claim-Engine.git
+   cd AI-Insurance-Claim-Engine
+   ```
 
-  - It critically evaluates the evidence, checking for waiting periods, exclusions, and coverage, before making a final decision and generating a detailed justification.
+2. **Install Dependencies:**
+   ```sh
+   pip install -r requirements.txt
+   ```
 
-# 🛠️ Tech Stack
-- Backend: Python, Flask
+3. **Set environment variables:**  
+   Create a `.env` file or export the necessary variables:
+   ```
+   GROQ_API_KEY=<your_groq_api_key>
+   HF_TOKEN=<your_huggingface_token>   # if using Hugging Face models
+   ```
 
-- AI Framework: LangChain
+4. **Place PDF Policy Documents**
+   - Place your policy `.pdf` files inside the `data/` directory.
 
-- LLM: OpenAI (gpt-3.5-turbo)
+5. **Run the App:**
+   ```sh
+   python app/application.py
+   ```
+   The app runs by default on `http://0.0.0.0:5000`.
 
-- Embeddings: Hugging Face sentence-transformers/all-MiniLM-L6-v2
+### Docker
 
-- Vector Store: FAISS (Facebook AI Similarity Search)
+1. **Build the Docker image:**
+   ```sh
+   docker build -t ai-insurance-claim-engine .
+   ```
+2. **Run the container:**
+   ```sh
+   docker run -p 5000:5000 --env-file=.env ai-insurance-claim-engine
+   ```
 
-- Document Loading: PyMuPDF for PDFs
+---
 
-- Environment Management: python-dotenv
+## Usage
 
-# 📦 Setup and Installation
-Follow these steps to get the application running locally.
+- Navigate to [http://localhost:5000](http://localhost:5000).
+- Enter natural language queries about insurance claims, e.g.:
+  ```
+  A 35-year-old male requesting a claim for a knee replacement after 2 years of policy tenure.
+  ```
+- The system responds with a "Decision", "Payout Amount", and "Justification Details," each mapping reasons to specific policy clauses.
 
-1. Prerequisites
-  - Python 3.10+
-  - An OpenAI API Key
+- Use the `/clear` endpoint or 'Clear' button to reset the chat session.
 
-2. Clone the Repository
-  - git clone https://github.com/Devmangukiya/AI-Insurance-Claim-Engine.git
-  - cd AI-Insurance-Claim-Engine
+---
 
+## Configuration
 
-3. Set Up a Virtual Environment
-# For Windows
-  - python -m venv venvai
-  - venv\Scripts\activate
+The main parameters are defined in `app/config/config.py`:
 
-# For macOS/Linux
-  - python3 -m venv venv
-  - source venv/bin/activate
+| Variable             | Description                      | Default                            |
+|----------------------|----------------------------------|------------------------------------|
+| `GROQ_API_KEY`       | LLM API key (env var required)   | -                                  |
+| `GROQ_MODEL_NAME`    | Groq or OpenAI model name        | `openai/gpt-oss-120b`              |
+| `HF_TOKEN`           | Hugging Face API token (optional)| -                                  |
+| `HUGGINGFACE_REPO_ID`| HuggingFace LLM repo             | `mistralai/Mistral-7B-Instruct-v0.3`|
+| `DATA_PATH`          | PDF storage path                 | `data/`                            |
+| `DB_FAISS_PATH`      | Vector DB path                   | `vectorstore/db_faiss`             |
+| `CHUNK_SIZE`         | Doc chunking size (chars)        | 500                                |
+| `CHUNK_OVERLAP`      | Doc chunk overlap (chars)        | 50                                 |
 
+---
 
-4. Install Dependencies
-pip install -r requirements.txt
+## Development
 
+- Code is modularized for testability and scalability.
+- Logging and custom exception handling in `app/common/`.
+- LLM, PDF parsing, and retrieval logic can be extended for new models or data types.
+- Includes a `Jenkinsfile` and a secondary `custom_jenkins/Dockerfile` for advanced CI/CD integration.
 
-5. Set Up Environment Variables
-Create a file named .env in the root of the project and add your OpenAI API key
+---
 
+## Technologies Used
 
+- **Python** (Flask, LangChain, PDF processing, FAISS)
+- **LLMs:** Groq (Llama3), Hugging Face
+- **Vector Storage:** FAISS
+- **Docker** (containerization)
+- **Jenkins** (optional CI/CD).
 
-6. Ingest Your Data
-Before running the app, you must process your policy documents and create the vector store. Place all your PDF documents in a designated folder (e.g., data/).
+---
 
-Then, run the ingestion script (you may need to create this script if you haven't already).
+## License
 
-python data_loader.py
+[MIT](LICENSE) (if provided).
 
+---
 
-This will create a faiss_index folder in your project directory.
+## Disclaimer
 
-7. Run the Application
-python application.py
-
-
-# 🚀 Usage
-
-1. Enter a query in the text box. Be as specific or as vague as you like.
-
-2. Example 1: 42-year-old man, cataract surgery in Mumbai, policy is 3 years old
-
-3. Example 2: my wife needs knee surgery in pune, we got the policy 2 months ago
-
-4. Click "Evaluate Claim" to receive the AI-generated decision and justification.
+- This project uses LLMs and AI reasoning—always review decisions for compliance before production use.
+- Sample policy files in `data/` are for demonstration only.
